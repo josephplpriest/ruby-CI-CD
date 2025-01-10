@@ -3,6 +3,9 @@
 require 'sinatra'
 require 'erb'
 
+set :bind, '0.0.0.0'
+set :port, 3000
+
 # The App class serves as the main application logic.
 # It includes methods to handle user interactions.
 class App
