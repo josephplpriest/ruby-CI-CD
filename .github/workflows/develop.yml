@@ -1,0 +1,65 @@
+name: ruby-app-CICD
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: tag to give image
+        type: string
+        default: 'ruby-app'
+      docker_build_dir:
+        description: path to run docker build
+        type: string
+        default: 'app/'
+
+jobs:
+  
+  ruby-app-setup:
+  
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./app
+    
+    steps:
+       
+      - name: Check out repository code
+        uses: actions/checkout@v4
+  
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+      
+      - run: bundle install
+
+      - run: bundle exec rubocop
+
+      - run: bundle exec bundle-audit update
+
+      - run: bundle exec bundle-audit
+
+  build-scan:
+    
+    needs: ruby-app-setup
+    
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+
+      - name: Build an image from Dockerfile
+        run: docker build -t ${{ inputs.image_tag }}:${{ github.sha }} .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: '${{ inputs.image_tag }}:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'

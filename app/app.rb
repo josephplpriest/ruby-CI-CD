@@ -21,7 +21,7 @@ end
 
 post '/greet' do
   name = params[:name]
-  greeting = App.greet(name || "Guest")
+  greeting = App.greet(name || 'Guest')
   erb :greet, locals: { greeting: greeting }
 end
 
@@ -36,3 +36,4 @@ __END__
 
 @@greet
 <h1><%= greeting %></h1>
+
