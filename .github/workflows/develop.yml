@@ -3,10 +3,10 @@ name: ruby-app-CICD
 on:
   workflow_dispatch:
     inputs:
-      path_to_dockerfile:  
-        description:
-        default:
-        type:
+      path_to_dockerfile: 
+        description: path to dockerfile in repo
+        default: './'
+        type: string
       image_tag:
         description: tag to give image
         type: string
@@ -15,6 +15,10 @@ on:
         description: path to run docker build
         type: string
         default: 'app/'
+      lifecycle_policy_file:
+        description: ecr repository lifecyle policy
+        default: 'policy.json'
+        type: string
       github_iam_role:
         description: github actions role to assume
         default: 'GitHubAction-AssumeRoleWithAction'
