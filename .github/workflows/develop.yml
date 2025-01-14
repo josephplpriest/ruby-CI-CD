@@ -1,7 +1,12 @@
 name: ruby-app-CICD
 
 on:
-  workflow_dispatch:
+  push:
+
+    branches:
+      - main
+      - develop
+
     inputs:
       path_to_dockerfile: 
         description: path to dockerfile in repo
@@ -112,8 +117,15 @@ jobs:
       image_tag: ${{ steps.build-publish.outputs.image_tag }}
       full_image: ${{ steps.build-publish.outputs.full_image }}
 
+    env:
+      MY_BRANCH_VAR: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Get short commit hash
+        id: get_commit_hash
+        run: echo "COMMIT_HASH=$(git rev-parse --short $GITHUB_SHA)" >> $GITHUB_ENV
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -133,7 +145,6 @@ jobs:
           # lowercase the name
           repo="${GITHUB_REPOSITORY,,}"
 
-          # replace / with _
           echo "ECR_REPO_NAME=${repo//\//_}" >> $GITHUB_ENV
 
       - name: TF init
@@ -178,7 +189,7 @@ jobs:
           ECR_REPOSITORY: ${{ env.ECR_REPO_NAME }}
           IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
-          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
+          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG_$MY_BRANCH_VAR_$COMMIT_HASH" .
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           echo "IMAGE $IMAGE_TAG is pushed to $ECR_REGISTRY/$ECR_REPOSITORY"
           echo "image_tag=$IMAGE_TAG" 
