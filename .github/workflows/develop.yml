@@ -90,7 +90,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build an image from Dockerfile
-        run: docker build -t "${{ inputs.image_tag }}:${{ github.sha }}" .
+        run: docker build -t "${{ inputs.image_tag }}:${{ github.sha }}" -f "${{ inputs.path_to_dockerfile }}" "${{ inputs.docker_build_dir }}/"
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          PATH_TO_DOCKERFILE: ${{ inputs.path_to_dockerfile }}
+          DOCKER_BUILD_DIR: ${{ inputs.docker_build_dir }}
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.28.0
