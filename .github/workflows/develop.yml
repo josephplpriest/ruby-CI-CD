@@ -39,7 +39,7 @@ on:
         description: region to create/manage resources in
         default: us-east-1
         type: string
-      backend_dynamo_db_table:
+      backend_dynamodb_table:
         description: table to store tf lock state
         default: 'terraform-state-lock-db'
         type: string
