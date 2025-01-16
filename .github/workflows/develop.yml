@@ -143,8 +143,8 @@ jobs:
           ECR_REPOSITORY: ${{ env.ECR_REPO_NAME }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
-          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$FULL_IMAGE_TAG_$MY_BRANCH_VAR_$COMMIT_HASH" .
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$FULL_IMAGE_TAG"
+          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG_$MY_BRANCH_VAR_$COMMIT_HASH" .
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG_$MY_BRANCH_VAR_$COMMIT_HASH"
           echo "IMAGE $IMAGE_TAG is pushed to $ECR_REGISTRY/$ECR_REPOSITORY"
           echo "image_tag=$FULL_IMAGE_TAG" 
           echo "full_image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
