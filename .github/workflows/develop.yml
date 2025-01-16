@@ -5,55 +5,23 @@ on:
     branches:
       - main
       - develop
-  workflow_call:
-    inputs:
-      path_to_dockerfile: 
-        description: path to dockerfile in repo
-        default: './Dockerfile'
-        type: string
-      image_tag:
-        description: tag to give image
-        type: string
-        default: 'ruby-app'
-      docker_build_dir:
-        description: path to run docker build
-        type: string
-        default: 'app/'
-      lifecycle_policy_file:
-        description: ecr repository lifecyle policy
-        default: 'policy.json'
-        type: string
-      github_iam_role:
-        description: github actions role to assume
-        default: 'GitHubAction-AssumeRoleWithAction'
-        type: string
-      backend_iam_role:
-        description: role for backend (s3, dynamodb, ecr) access
-        default: 'tf-backend-access-role'
-        type: string
-      backend_s3_bucket:
-        description: s3 bucket to store state file in
-        default: 'ruby-ci-cd-281280216542'
-        type: string
-      aws_account_id:
-        description: aws account id
-        default: '281280216542'
-        type:  string
-      aws_region:
-        description: region to create/manage resources in
-        default: us-east-1
-        type: string
-      backend_dynamodb_table:
-        description: table to store tf lock state
-        default: 'terraform-state-lock-db'
-        type: string
+
+env:
+  PATH_TO_DOCKERFILE: './Dockerfile'
+  IMAGE_TAG: 'ruby-app'
+  DOCKER_BUILD_DIR: 'app/'
+  LIFECYCLE_POLICY_FILE: 'policy.json'
+  GITHUB_IAM_ROLE: 'GitHubAction-AssumeRoleWithAction'
+  BACKEND_IAM_ROLE: 'tf-backend-access-role'
+  BACKEND_S3_BUCKET: 'ruby-ci-cd-281280216542'
+  AWS_ACCOUNT_ID: '281280216542'
+  AWS_REGION: 'us-east-1'
+  BACKEND_DYNAMODB_TABLE: 'terraform-state-lock-db'
 
 concurrency: ci-${{ github.repository }}-docker-pipeline
 
 jobs:
-  
   ruby-app-setup:
-  
     runs-on: ubuntu-latest
     
     defaults:
@@ -61,7 +29,6 @@ jobs:
         working-directory: ./app
     
     steps:
-       
       - name: Check out repository code
         uses: actions/checkout@v4
 
@@ -79,9 +46,7 @@ jobs:
       - run: bundle exec bundle-audit
 
   build-scan:
-    
     needs: ruby-app-setup
-    
     runs-on: ubuntu-latest
 
     steps:
@@ -89,16 +54,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build an image from Dockerfile
-        run: docker build -t "${{ inputs.image_tag }}:${{ github.sha }}" -f "${{ inputs.path_to_dockerfile }}" "${{ inputs.docker_build_dir }}/"
-        env:
-          IMAGE_TAG: ${{ inputs.image_tag }}
-          PATH_TO_DOCKERFILE: ${{ inputs.path_to_dockerfile }}
-          DOCKER_BUILD_DIR: ${{ inputs.docker_build_dir }}
+        run: docker build -t "${{ env.IMAGE_TAG }}:${{ github.sha }}" -f "${{ env.PATH_TO_DOCKERFILE }}" "${{ env.DOCKER_BUILD_DIR }}/"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: '${{ inputs.image_tag }}:${{ github.sha }}'
+          image-ref: '${{ env.IMAGE_TAG }}:${{ github.sha }}'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
@@ -106,9 +67,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
   docker:
-    
     needs: build-scan
-
     runs-on: ubuntu-latest
 
     permissions:
@@ -132,56 +91,49 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/${{ inputs.github_iam_role }}
-          aws-region: ${{ inputs.aws_region }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.GITHUB_IAM_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_wrapper: false
 
-      - name: prepare ECR repo name based on the Github repository
+      - name: Prepare ECR repo name based on the Github repository
         shell: bash
         run: |
           set -eux
-          # lowercase the name
           repo="${GITHUB_REPOSITORY,,}"
-
           echo "ECR_REPO_NAME=${repo//\//_}" >> $GITHUB_ENV
 
       - name: TF init
         shell: bash
         run: |
-          set -eux
           terraform init -upgrade -reconfigure \
             -backend-config='skip_metadata_api_check=true' \
             -backend-config='skip_region_validation=true' \
             -backend-config='skip_credentials_validation=true' \
-            -backend-config='region=${{ inputs.aws_region }}' \
-            -backend-config='bucket=${{ inputs.backend_s3_bucket }}' \
+            -backend-config='region=${{ env.AWS_REGION }}' \
+            -backend-config='bucket=${{ env.BACKEND_S3_BUCKET }}' \
             -backend-config='key=docker-ecr/terraform-${{ env.ECR_REPO_NAME }}.tfstate' \
-            -backend-config='dynamodb_table=${{ inputs.backend_dynamodb_table }}' \
-            -backend-config='assume_role={"role_arn":"arn:aws:iam::${{ inputs.aws_account_id }}:role/${{ inputs.backend_iam_role }}"}'
-
-        working-directory: ${{ github.action_path }}
+            -backend-config='dynamodb_table=${{ env.BACKEND_DYNAMODB_TABLE }}' \
+            -backend-config='assume_role={"role_arn":"arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.BACKEND_IAM_ROLE }}"}'
 
       - name: Create ECR repo [TF apply]
         shell: bash
         run: |
-          set -eux
           terraform apply \
-            -var 'repository_name=${{ env.ECR_REPO_NAME }}' \
-            -var 'lifecycle_policy=${{ inputs.lifecycle_policy_file }}' \
-            -var 'iam_role=arn:aws:iam::${{ inputs.aws_account_id }}:role/${{ inputs.backend_iam_role }}' \
-            -var 'aws_account_id=${{ inputs.aws_account_id }}' \
+            -var "repository_name=${{ env.ECR_REPO_NAME }}" \
+            -var "lifecycle_policy=${{ env.LIFECYCLE_POLICY_FILE }}" \
+            -var "iam_role=arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.BACKEND_IAM_ROLE }}" \
+            -var "aws_account_id=${{ env.AWS_ACCOUNT_ID }}" \
             -auto-approve
-        working-directory: ${{ github.action_path }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
         with:
-          registries: ${{ inputs.aws_account_id }}
+          registries: ${{ env.AWS_ACCOUNT_ID }}
 
       - name: Build, tag, and push image to Amazon ECR
         id: build-publish
@@ -189,7 +141,7 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ env.ECR_REPO_NAME }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$FULL_IMAGE_TAG_$MY_BRANCH_VAR_$COMMIT_HASH" .
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$FULL_IMAGE_TAG"
